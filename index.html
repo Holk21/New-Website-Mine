@@ -216,6 +216,12 @@ input:checked + .slider::before{transform:translateX(20px); background:var(--jad
 .modal-footer-note{font-size:12px; color:var(--muted); margin-top:24px; line-height:1.6; border-top:1px solid var(--line-soft); padding-top:18px;}
 .staff-logout{margin-top:18px; background:none; border:1px solid var(--line); color:var(--muted); font-size:13px; padding:9px 16px; border-radius:20px; cursor:pointer;}
 .staff-logout:hover{color:var(--bone); border-color:var(--jade-dim);}
+.webhook-section{margin-top:24px; padding-top:20px; border-top:1px solid var(--line-soft);}
+.webhook-heading{font-family:var(--serif); font-style:italic; font-weight:600; font-size:18px; margin-bottom:6px;}
+.webhook-section .field label{font-size:13px; color:var(--muted); margin-bottom:6px;}
+.webhook-section input{font-size:13px; letter-spacing:0;}
+.webhook-saved-note{display:none; color:var(--jade-bright); font-size:13px; margin-top:12px;}
+.webhook-saved-note.show{display:block;}
 
 /* ---------- footer ---------- */
 footer{padding:52px 0; text-align:center;}
@@ -647,6 +653,31 @@ footer a{color:var(--jade-bright); text-decoration:none;}
 
       <button class="staff-logout" onclick="staffLogout()">Log out</button>
 
+      <div class="webhook-section">
+        <h4 class="webhook-heading">Discord webhooks</h4>
+        <p class="sub" style="margin-bottom:16px;">Applications get sent to whichever channel each webhook points to. Paste a new one to replace it.</p>
+
+        <div class="field" style="margin-bottom:14px;">
+          <label>Police</label>
+          <input type="text" class="pin-input" id="webhook-police" placeholder="https://discord.com/api/webhooks/...">
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label>Fire and Emergency</label>
+          <input type="text" class="pin-input" id="webhook-fire" placeholder="https://discord.com/api/webhooks/...">
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label>Ambulance</label>
+          <input type="text" class="pin-input" id="webhook-ambulance" placeholder="https://discord.com/api/webhooks/...">
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label>Staff</label>
+          <input type="text" class="pin-input" id="webhook-staff" placeholder="https://discord.com/api/webhooks/...">
+        </div>
+
+        <button class="submit-btn" style="width:100%;" onclick="saveWebhooks()">Save webhooks</button>
+        <div class="webhook-saved-note" id="webhookSavedNote">Saved.</div>
+      </div>
+
       <div class="modal-footer-note">This toggle is saved in this browser's local storage. If you're hosting this file on a real server, everyone who loads the page from that server will see the same file — but for the open/closed state to be identical for every visitor everywhere, you'll want a small shared backend instead of local storage. Ask if you'd like that built.</div>
     </div>
   </div>
@@ -718,6 +749,42 @@ function setDeptStatus(dept, isOpen){
   renderDeptStatus();
 }
 
+/* ---------- webhooks (staff-editable) ---------- */
+function loadWebhooks(){
+  try{
+    var raw = localStorage.getItem('anrp_webhooks');
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return {};
+}
+function saveWebhooksToStorage(webhooks){
+  try{ localStorage.setItem('anrp_webhooks', JSON.stringify(webhooks)); }catch(e){}
+}
+var storedWebhooks = loadWebhooks();
+
+function getWebhookUrl(dept){
+  return (storedWebhooks[dept] && storedWebhooks[dept].trim()) || CONFIG.webhooks[dept] || "";
+}
+
+function renderWebhookInputs(){
+  DEPTS.forEach(function(d){
+    var input = document.getElementById('webhook-' + d);
+    if(input) input.value = getWebhookUrl(d);
+  });
+  document.getElementById('webhookSavedNote').classList.remove('show');
+}
+
+function saveWebhooks(){
+  DEPTS.forEach(function(d){
+    var input = document.getElementById('webhook-' + d);
+    if(input) storedWebhooks[d] = input.value.trim();
+  });
+  saveWebhooksToStorage(storedWebhooks);
+  var note = document.getElementById('webhookSavedNote');
+  note.classList.add('show');
+  setTimeout(function(){ note.classList.remove('show'); }, 2500);
+}
+
 /* ---------- staff modal ---------- */
 var staffAuthed = false;
 try{ staffAuthed = localStorage.getItem('anrp_staff_authed') === '1'; }catch(e){}
@@ -739,6 +806,7 @@ function showStaffPanel(){
   document.getElementById('staffLoginView').style.display = 'none';
   document.getElementById('staffPanelView').style.display = 'block';
   renderDeptStatus();
+  renderWebhookInputs();
 }
 function checkStaffPin(){
   var val = document.getElementById('staffPin').value;
@@ -806,7 +874,7 @@ function submitApp(evt, dept){
 
   var summary = CONFIG.serverName + ' — ' + DEPT_LABELS[dept] + ' application\n\n' + lines.join('\n');
   var resultBox = document.getElementById('result-' + dept);
-  var webhook = CONFIG.webhooks[dept];
+  var webhook = getWebhookUrl(dept);
 
   if(webhook){
     fetch(webhook, {
