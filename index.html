@@ -848,19 +848,40 @@ function copyResult(btn){
 }
 
 /* ---------- live status ---------- */
+function parseStatusJson(json){
+  var d = json.Data || json.data;
+  if(!d) throw new Error('no data');
+  var players = (d.clients !== undefined) ? d.clients : (d.players ? d.players.length : null);
+  var max = d.sv_maxclients || d.svMaxclients || (d.vars && d.vars.sv_maxclients) || null;
+  var hostname = d.hostname || CONFIG.serverName;
+  renderStatus(true, players, max, hostname);
+}
+
 function fetchStatus(){
-  fetch('https://servers-frontend.fivem.net/api/servers/single/' + CONFIG.joinCode)
-    .then(function(res){ return res.json(); })
-    .then(function(json){
-      var d = json.Data || json.data;
-      if(!d) throw new Error('no data');
-      var players = (d.clients !== undefined) ? d.clients : (d.players ? d.players.length : null);
-      var max = d.sv_maxclients || d.svMaxclients || (d.vars && d.vars.sv_maxclients) || null;
-      var hostname = d.hostname || CONFIG.serverName;
-      renderStatus(true, players, max, hostname);
+  var directUrl = 'https://servers-frontend.fivem.net/api/servers/single/' + CONFIG.joinCode;
+
+  // Try a direct request first.
+  fetch(directUrl)
+    .then(function(res){
+      if(!res.ok) throw new Error('bad response');
+      return res.json();
     })
+    .then(parseStatusJson)
     .catch(function(){
-      renderStatus(null, null, null, null);
+      // Direct request was blocked (CORS) or failed — retry through a public
+      // relay that adds the missing header. If your host later gives you a
+      // CORS-safe way to call FiveM's API directly, you can remove this
+      // fallback and just use directUrl above.
+      var proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directUrl);
+      fetch(proxyUrl)
+        .then(function(res){
+          if(!res.ok) throw new Error('bad response');
+          return res.json();
+        })
+        .then(parseStatusJson)
+        .catch(function(){
+          renderStatus(null, null, null, null);
+        });
     });
 }
 function renderStatus(online, players, max, hostname){
