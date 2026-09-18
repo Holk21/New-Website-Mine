@@ -223,6 +223,25 @@ input:checked + .slider::before{transform:translateX(20px); background:var(--jad
 .webhook-saved-note{display:none; color:var(--jade-bright); font-size:13px; margin-top:12px;}
 .webhook-saved-note.show{display:block;}
 
+/* ---------- review dashboard ---------- */
+.review-card{border:1px solid var(--line); background:var(--bg-surface); padding:24px; margin-bottom:16px;}
+.review-card-head{display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:14px; flex-wrap:wrap;}
+.review-card-title{font-family:var(--serif); font-size:19px; font-weight:600;}
+.review-card-meta{font-size:12px; color:var(--muted); margin-top:4px;}
+.review-status{font-size:11px; font-weight:600; letter-spacing:0.4px; padding:3px 10px; border-radius:20px; border:1px solid; white-space:nowrap; height:fit-content;}
+.review-status.pending{color:var(--ochre); border-color:rgba(214,140,70,0.4); background:rgba(214,140,70,0.08);}
+.review-status.accepted{color:var(--jade-bright); border-color:var(--jade-dim); background:rgba(116,168,136,0.08);}
+.review-status.declined{color:var(--red); border-color:rgba(201,97,77,0.4); background:rgba(201,97,77,0.08);}
+.review-card-body{white-space:pre-wrap; font-size:13.5px; color:#dcd8c8; line-height:1.7; background:var(--bg-void); border:1px solid var(--line-soft); padding:14px 16px; max-height:220px; overflow-y:auto; margin-bottom:16px;}
+.review-card-actions{display:flex; gap:10px; flex-wrap:wrap;}
+.review-btn{border:1px solid var(--line); background:none; color:var(--bone); font-family:var(--sans); font-size:13px; font-weight:500; padding:9px 18px; border-radius:2px; cursor:pointer;}
+.review-btn.accept{border-color:var(--jade-dim); color:var(--jade-bright);}
+.review-btn.accept:hover{background:rgba(116,168,136,0.1);}
+.review-btn.decline{border-color:rgba(201,97,77,0.4); color:var(--red);}
+.review-btn.decline:hover{background:rgba(201,97,77,0.1);}
+.review-btn.reset{color:var(--muted);}
+.review-btn.reset:hover{color:var(--bone);}
+
 /* ---------- footer ---------- */
 footer{padding:52px 0; text-align:center;}
 footer p{font-size:13px; color:var(--muted);}
@@ -240,6 +259,7 @@ footer a{color:var(--jade-bright); text-decoration:none;}
       <button class="nav-btn" data-page="rules" onclick="goPage('rules')">Rules</button>
       <button class="nav-btn" data-page="apply" onclick="goPage('apply')">Applications</button>
       <button class="nav-btn" data-page="status" onclick="goPage('status')">Server status</button>
+      <button class="nav-btn" data-page="review" onclick="goPage('review')">Review</button>
     </nav>
     <div class="topbar-right">
       <div class="status-pill" id="navStatusPill">
@@ -611,6 +631,52 @@ footer a{color:var(--jade-bright); text-decoration:none;}
   </section>
 </div>
 
+<!-- ================= REVIEW (staff only) ================= -->
+<div class="page" id="page-review">
+  <section class="block" style="padding-top:56px; border-bottom:none;">
+    <div class="wrap">
+
+      <div id="reviewGate" style="max-width:420px;">
+        <h2 class="block-title" style="margin-bottom:8px;">Staff review</h2>
+        <p class="block-note" style="margin-bottom:24px;">Enter the staff PIN to view and decide on applications.</p>
+        <input type="password" class="pin-input" id="reviewPin" placeholder="PIN" onkeydown="if(event.key==='Enter')checkReviewPin()">
+        <button class="submit-btn" style="width:100%; margin-top:14px;" onclick="checkReviewPin()">Unlock</button>
+        <div class="modal-error" id="reviewPinError">Wrong PIN. Try again.</div>
+      </div>
+
+      <div id="reviewPanel" style="display:none;">
+        <div class="block-head">
+          <h2 class="block-title">Applications</h2>
+          <p class="block-note">Accept or decline. Everyone with the staff PIN sees the same list.</p>
+        </div>
+
+        <div class="apply-tabs" id="reviewDeptTabs">
+          <button class="apply-tab active" data-dept="all" onclick="switchReviewTab('all')">All</button>
+          <button class="apply-tab" data-dept="police" onclick="switchReviewTab('police')">Police</button>
+          <button class="apply-tab" data-dept="fire" onclick="switchReviewTab('fire')">Fire</button>
+          <button class="apply-tab" data-dept="ambulance" onclick="switchReviewTab('ambulance')">Ambulance</button>
+          <button class="apply-tab" data-dept="staff" onclick="switchReviewTab('staff')">Staff</button>
+        </div>
+
+        <div class="apply-tabs" id="reviewStatusTabs" style="border-bottom:1px solid var(--line-soft); margin-bottom:32px;">
+          <button class="apply-tab active" data-status="pending" onclick="switchReviewStatus('pending')">Pending</button>
+          <button class="apply-tab" data-status="accepted" onclick="switchReviewStatus('accepted')">Accepted</button>
+          <button class="apply-tab" data-status="declined" onclick="switchReviewStatus('declined')">Declined</button>
+        </div>
+
+        <p class="refresh-note" style="margin-bottom:24px;">
+          <button class="text-link secondary" style="font-size:13px;" onclick="fetchApplications()">Refresh list</button>
+        </p>
+
+        <div id="reviewList"></div>
+        <p class="block-note" id="reviewEmpty" style="display:none;">Nothing here right now.</p>
+        <p class="block-note" id="reviewNotConfigured" style="display:none; max-width:56ch;">The applications database isn't connected yet — add your Supabase URL and key in CONFIG near the top of the &lt;script&gt; section.</p>
+      </div>
+
+    </div>
+  </section>
+</div>
+
 <footer>
   <div class="wrap">
     <p>Aotearoa Nationwide RP 3.0 — not affiliated with New Zealand Police, Fire and Emergency New Zealand, or any real emergency service. <a href="https://cfx.re/join/z64p9d" target="_blank" rel="noopener">cfx.re/join/z64p9d</a></p>
@@ -691,6 +757,12 @@ var CONFIG = {
   discordInvite: "",
   contactEmail: "recruitment@example.com",
   staffPassword: "aotearoa2026",
+  // Fill these in once you've created your free Supabase project and the
+  // "applications" table — see the setup steps you were given. Leave blank
+  // and the review dashboard just shows a "not connected" message instead
+  // of breaking.
+  supabaseUrl: "",
+  supabaseKey: "",
   webhooks: {
     police: "https://discord.com/api/webhooks/1549341917936877661/FCIws4BIAtGphxZaZVAmxY8kmT_6wB1z2uVCi1fQptCFpFOvZQurJwMwjMDmL2oylDl2",
     fire: "https://discord.com/api/webhooks/1549342121532723291/tCNqQbpyznEiqSjnC00uM3FKvK6HMNSF8ZOY_3xj7bVVQUbhh4y50R_iWqJRRoqPZYCV",
@@ -831,6 +903,7 @@ function goPage(name){
   document.querySelectorAll('.nav-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.page === name); });
   document.getElementById('mainNav').classList.remove('open');
   window.scrollTo(0,0);
+  if(name === 'review') maybeShowReviewGate();
 }
 function goApply(dept){
   goPage('apply');
@@ -876,6 +949,8 @@ function submitApp(evt, dept){
   var resultBox = document.getElementById('result-' + dept);
   var webhook = getWebhookUrl(dept);
 
+  saveApplicationToDb(dept, summary);
+
   if(webhook){
     fetch(webhook, {
       method: 'POST',
@@ -890,6 +965,19 @@ function submitApp(evt, dept){
     showResult(resultBox, null, summary);
   }
   return false;
+}
+function saveApplicationToDb(dept, summary){
+  if(!CONFIG.supabaseUrl || !CONFIG.supabaseKey) return;
+  fetch(CONFIG.supabaseUrl + '/rest/v1/applications', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': CONFIG.supabaseKey,
+      'Authorization': 'Bearer ' + CONFIG.supabaseKey,
+      'Prefer': 'return=minimal'
+    },
+    body: JSON.stringify({ department: dept, summary: summary, status: 'pending' })
+  }).catch(function(){ /* the applicant already sees a result either way */ });
 }
 function showResult(box, sent, summary){
   var status;
@@ -1003,6 +1091,130 @@ function renderStatus(online, players, max, hostname){
 renderDeptStatus();
 fetchStatus();
 setInterval(fetchStatus, 30000);
+
+/* ---------- review dashboard ---------- */
+var reviewAuthed = false;
+try{ reviewAuthed = localStorage.getItem('anrp_staff_authed') === '1'; }catch(e){}
+var reviewDeptFilter = 'all';
+var reviewStatusFilter = 'pending';
+var reviewData = [];
+
+function checkReviewPin(){
+  var val = document.getElementById('reviewPin').value;
+  if(val === CONFIG.staffPassword){
+    reviewAuthed = true;
+    try{ localStorage.setItem('anrp_staff_authed', '1'); }catch(e){}
+    showReviewPanel();
+  } else {
+    document.getElementById('reviewPinError').style.display = 'block';
+  }
+}
+function showReviewPanel(){
+  document.getElementById('reviewGate').style.display = 'none';
+  document.getElementById('reviewPanel').style.display = 'block';
+  fetchApplications();
+}
+function maybeShowReviewGate(){
+  if(reviewAuthed){
+    document.getElementById('reviewGate').style.display = 'none';
+    document.getElementById('reviewPanel').style.display = 'block';
+    fetchApplications();
+  } else {
+    document.getElementById('reviewGate').style.display = 'block';
+    document.getElementById('reviewPanel').style.display = 'none';
+  }
+}
+
+function switchReviewTab(dept){
+  reviewDeptFilter = dept;
+  document.querySelectorAll('#reviewDeptTabs .apply-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.dept === dept); });
+  renderApplications();
+}
+function switchReviewStatus(status){
+  reviewStatusFilter = status;
+  document.querySelectorAll('#reviewStatusTabs .apply-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.status === status); });
+  renderApplications();
+}
+
+function fetchApplications(){
+  if(!CONFIG.supabaseUrl || !CONFIG.supabaseKey){
+    document.getElementById('reviewNotConfigured').style.display = 'block';
+    document.getElementById('reviewList').innerHTML = '';
+    document.getElementById('reviewEmpty').style.display = 'none';
+    return;
+  }
+  document.getElementById('reviewNotConfigured').style.display = 'none';
+
+  fetch(CONFIG.supabaseUrl + '/rest/v1/applications?select=*&order=created_at.desc', {
+    headers: {
+      'apikey': CONFIG.supabaseKey,
+      'Authorization': 'Bearer ' + CONFIG.supabaseKey
+    }
+  })
+  .then(function(res){ return res.json(); })
+  .then(function(data){
+    reviewData = Array.isArray(data) ? data : [];
+    renderApplications();
+  })
+  .catch(function(){
+    document.getElementById('reviewList').innerHTML = '';
+    document.getElementById('reviewEmpty').textContent = "Couldn't load applications right now — check your Supabase URL and key.";
+    document.getElementById('reviewEmpty').style.display = 'block';
+  });
+}
+
+function renderApplications(){
+  var list = document.getElementById('reviewList');
+  var empty = document.getElementById('reviewEmpty');
+  empty.textContent = 'Nothing here right now.';
+
+  var filtered = reviewData.filter(function(app){
+    var deptMatch = reviewDeptFilter === 'all' || app.department === reviewDeptFilter;
+    var statusMatch = (app.status || 'pending') === reviewStatusFilter;
+    return deptMatch && statusMatch;
+  });
+
+  if(filtered.length === 0){
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  list.innerHTML = filtered.map(function(app){
+    var when = app.created_at ? new Date(app.created_at).toLocaleString([], {dateStyle:'medium', timeStyle:'short'}) : '';
+    var status = app.status || 'pending';
+    var actions = '';
+    if(status !== 'accepted') actions += '<button class="review-btn accept" onclick="setApplicationStatus(\'' + app.id + '\',\'accepted\')">Accept</button>';
+    if(status !== 'declined') actions += '<button class="review-btn decline" onclick="setApplicationStatus(\'' + app.id + '\',\'declined\')">Decline</button>';
+    if(status !== 'pending') actions += '<button class="review-btn reset" onclick="setApplicationStatus(\'' + app.id + '\',\'pending\')">Reset to pending</button>';
+
+    return '<div class="review-card">' +
+      '<div class="review-card-head">' +
+        '<div><div class="review-card-title">' + (DEPT_LABELS[app.department] || app.department) + '</div>' +
+        '<div class="review-card-meta">' + when + '</div></div>' +
+        '<span class="review-status ' + status + '">' + status.charAt(0).toUpperCase() + status.slice(1) + '</span>' +
+      '</div>' +
+      '<div class="review-card-body">' + (app.summary || '').replace(/</g,'&lt;') + '</div>' +
+      '<div class="review-card-actions">' + actions + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function setApplicationStatus(id, status){
+  fetch(CONFIG.supabaseUrl + '/rest/v1/applications?id=eq.' + encodeURIComponent(id), {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': CONFIG.supabaseKey,
+      'Authorization': 'Bearer ' + CONFIG.supabaseKey,
+      'Prefer': 'return=minimal'
+    },
+    body: JSON.stringify({ status: status })
+  }).then(function(){
+    fetchApplications();
+  });
+}
 
 </script>
 </body>
